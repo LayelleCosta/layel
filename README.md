@@ -1,0 +1,4 @@
+Durante o curso consegui imaginar diversos cenários para a criação de sites e até mesmo aprimoramento de banco de dados. No projeto do Lab 001, enfrentei algumas dificuldades como iniciante, como algumas alterações e erro no banco de dados e até mesmo a imcompatibilidade de algumas aplicações ultilizadas na aula que não eram mais válidas para a versão de Python que estava ultilizando, entretanto isso me motivou a buscar a solução desses problemas e também a futuramente adicionais mais requisitos ao código e aprimora-ló. 
+![mudança do pymssql para pyodbc](https://github.com/user-attachments/assets/74ecf69c-d18f-4690-a275-df6be17fbfd5)
+![códico com o pymssql](https://github.com/user-attachments/assets/1e2ac79f-2ab0-4eb8-ab3f-0cd0b473dbd8)
+![env](https://github.com/user-attachments/assets/3aae87ef-2de6-4d96-b0ec-a0fe3299482a)
