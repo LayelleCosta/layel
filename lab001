@@ -1,0 +1,138 @@
+import streamlit as st
+from azure.storage.blob import BlobServiceClient
+import os
+import pyodbc
+import uuid
+from dotenv import load_dotenv
+
+# Carregar variáveis do .env
+load_dotenv()
+
+# Variáveis de ambiente
+Blobconectionstring = os.getenv("BLOB_CONECTION_STRING")
+Blobcontainername = os.getenv("BLOB_CONTAINER_NAME")
+Blobaccountname = os.getenv("BLOB_ACCOUNT_NAME")
+
+SQL_SERVER = os.getenv("SQL_SERVER")
+SQL_DATABASE = os.getenv("SQL_DATABASE")
+SQL_USERNAME = os.getenv("SQL_USERNAME")
+SQL_PASSWORD = os.getenv("SQL_PASSWORD")
+
+# Função de conexão com banco
+def get_db_connection():
+    # Debug das variáveis de ambiente
+    st.write("🔧 Debug conexão SQL:")
+    st.write("Servidor:", SQL_SERVER)
+    st.write("Banco:", SQL_DATABASE)
+    st.write("Usuário:", SQL_USERNAME)
+
+    connection_string = (
+        f'DRIVER={{ODBC Driver 17 for SQL Server}};'
+        f'SERVER={SQL_SERVER};'
+        f'DATABASE={SQL_DATABASE};'
+        f'UID={SQL_USERNAME};'
+        f'PWD={SQL_PASSWORD}'
+    )
+    return pyodbc.connect(connection_string)
+
+# Função para enviar imagem ao Azure Blob
+def upload_to_blob(file):
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(Blobconectionstring)
+        blob_client = blob_service_client.get_blob_client(container=Blobcontainername, blob=str(uuid.uuid4()) + "_" + file.name)
+        blob_client.upload_blob(file, overwrite=True)
+        image_url = f"https://{Blobaccountname}.blob.core.windows.net/{Blobcontainername}/{blob_client.blob_name}"
+        return image_url
+    except Exception as e:
+        st.error(f"Erro ao enviar imagem: {e}")
+        return None
+
+# Função para inserir produto no banco
+def insert_product(product_name, product_price, product_description, product_image):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO Produtos (Nome, Preco, Descricao, imagem_url)
+            VALUES (?, ?, ?, ?)
+        """, (product_name, product_price, product_description, product_image))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar produto: {e}")
+        return False
+
+# Interface
+st.title("Cadastro de Produtos")
+
+# Campos de entrada
+product_name = st.text_input("Nome do Produto")
+product_price = st.number_input("Preço do Produto", min_value=0.0, format="%.2f")
+product_description = st.text_area("Descrição do Produto")
+product_image = st.file_uploader("Imagem do Produto", type=["jpg", "jpeg", "png"])
+
+# Botão de cadastro
+if st.button("Cadastrar Produto"):
+    if product_name and product_image:
+        image_url = upload_to_blob(product_image)
+        if image_url:
+            if insert_product(product_name, product_price, product_description, image_url):
+                st.success("✅ Produto cadastrado com sucesso!")
+                st.image(image_url, width=300)
+        else:
+            st.error("❌ Erro ao enviar imagem para o Blob.")
+    else:
+        st.warning("Preencha o nome do produto e selecione uma imagem!")
+
+# Seção de listagem
+st.header("Produtos cadastrados")
+
+if st.button("Listar Produtos"):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT Nome, Preco, Descricao, imagem_url FROM Produtos")
+        rows = cursor.fetchall()
+        for row in rows:
+            st.markdown(f"### {row[0]}")
+            st.write(f"💰 Preço: R${row[1]:.2f}")
+            st.write(f"📄 Descrição: {row[2]}")
+            if row[3]:
+                st.image(row[3], width=200)
+        conn.close()
+    except Exception as e:
+        st.error(f"❌ Erro ao listar produtos: {e}")
+
+class Database:
+    def sql(self):
+        # Example: Fetch products from a database
+        return [
+            {"nome": "Produto 1", "descricao": "Descrição do Produto 1"},
+            {"nome": "Produto 2", "descricao": "Descrição do Produto 2"},
+        ]
+
+list_productos = Database()
+
+def list_produtos_screen():
+    produtos = list_productos.sql()
+    if produtos:
+        # Define o número de cards por linha
+        cards_por_linha = 3
+        # Cria as colunas iniciais
+        cols = st.columns(cards_por_linha)
+        for i, produto in enumerate(produtos):
+            col = cols[i % cards_por_linha]
+            with col:
+                st.markdown(f"### {produto['nome']}")
+                st.write(f"**Descrição:** {produto['descricao']}")
+                st.write(f"**Preço:** R$ {produto['preco']:.2f}")
+                if produto['imagem']:
+                    html_img = f'<img src="{produto["imagem_url"]}" width="200" height="200" alt="Imagem do produto">'
+                    st.markdown(html_img, unsafe_allow_html=True)
+                st.markdown("---")
+        # A cada 'cards_por_linha' produtos, se ainda houver produtos, cria novas colunas
+        if (i + 1) % cards_por_linha == 0 and (i + 1) < len(produtos):
+            cols = st.columns(cards_por_linha)
+    else:
+        st.info("Nenhum produto encontrado.")
